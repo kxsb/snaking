@@ -1,4 +1,7 @@
 # snake_train.py/ moteur d'itération pour entrainer le snake. fonctionne avec snake_env, mais distinctement de snake_brain. peut être lancer en parallèle. 
+# variante B1
+
+# snake_train.py
 
 import torch
 import torch.nn as nn
@@ -12,6 +15,35 @@ from IPython.display import display, clear_output
 
 MODEL_PATH = 'snake_model.pth'
 
+# Créer la figure et les sous-graphiques une seule fois
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
+scores = []
+losses = []
+
+# Initialisation pour l'affichage en temps réel
+plt.ion()
+
+def plot_scores_and_losses():
+    ax1.clear()  # Efface le sous-graphe des scores
+    ax2.clear()  # Efface le sous-graphe des pertes
+    
+    # Plot des scores
+    ax1.plot(scores, label='Score')
+    ax1.set_xlabel('Episodes')
+    ax1.set_ylabel('Score')
+    ax1.set_title('Scores Over Time')
+    ax1.legend()
+
+    # Plot des pertes
+    ax2.plot(losses, label='Loss')
+    ax2.set_xlabel('Episodes')
+    ax2.set_ylabel('Loss')
+    ax2.set_title('Loss Over Time')
+    ax2.legend()
+
+    fig.canvas.draw()
+    plt.pause(0.001)  # Pause pour mettre à jour l'affichage
+        
 class DQN(nn.Module):
     def __init__(self, input_dim, output_dim):
         super(DQN, self).__init__()
@@ -54,6 +86,7 @@ class SnakeAgent:
         for i in range(iterations):
             print(f"Starting iteration {i + 1}/{iterations}")
             state = self.get_state()
+            total_loss = 0
             for time in range(5000):
                 action = self.act(state)
                 next_state, reward, done = self.env.step(action)
@@ -63,17 +96,28 @@ class SnakeAgent:
 
                 if done:
                     print(f"Intense Training - Iteration: {i + 1}, Score: {self.env.score}")
+                    scores.append(self.env.score)  # Ajouter le score à la liste
                     self.env.reset()
                     break  # Sortie de la boucle en cas de fin de partie
-                self.replay(32)
+                
+                # Replay et collecte de la perte
+                loss = self.replay(32)
+                total_loss += loss
             
-            print(f"Completed iteration {i + 1}/{iterations}")
+            losses.append(total_loss)  # Ajouter la perte totale à la liste
+            
+            # Affichage du graphique après chaque épisode
+            plot_scores_and_losses()
+
+            # Option pour arrêter l'entraînement
+            if plt.waitforbuttonpress(0.1):  # Si une touche est pressée, interrompre l'entraînement
+                print("Training interrupted by user")
+                break
 
         print("Intense training completed.")
         self.save_model(self.model)
         print(f"Model saved to {MODEL_PATH}")
-    
-        
+            
     def get_state(self):
         state = self.env.get_state()
         snake = state['snake']
@@ -104,18 +148,19 @@ class SnakeAgent:
     def act(self, state):
         if np.random.rand() <= self.epsilon:
             action = random.choice([0, 1, 2])
-            print(f"Random action: {action}")
+            # print(f"Random action: {action}")
             return action
         act_values = self.model(torch.tensor(state, dtype=torch.float32))
         action = torch.argmax(act_values).item()
-        print(f"Model action: {action}")
+        # print(f"Model action: {action}")
         return action
 
     def replay(self, batch_size):
         if len(self.memory) < batch_size:
-            return
+            return 0
 
         minibatch = random.sample(self.memory, batch_size)
+        total_loss = 0
         for state, action, reward, next_state, done in minibatch:
             target = reward
             if not done:
@@ -127,37 +172,29 @@ class SnakeAgent:
 
             self.optimizer.zero_grad()
             loss = self.loss_fn(current_q_values, target_f)
-            print(f"Loss: {loss.item()}")  # Ajout de l'impression de la perte
+            # print(f"Loss: {loss.item()}")  # Affiche la perte à chaque mini-lot
             loss.backward()
             self.optimizer.step()
+            
+            total_loss += loss.item()  # Cumul de la perte
 
         if self.epsilon > self.epsilon_min:
             self.epsilon *= self.epsilon_decay
-
-    def save_model(self, model, path=MODEL_PATH):
-        torch.save(model.state_dict(), path)
-        print(f"Model saved to {path}")
-
-    def load_model(self, model, path=MODEL_PATH):
-        model.load_state_dict(torch.load(path))
-        model.eval()  # Set the model to evaluation mode
-        print(f"Model loaded from {path}")
+        
+        return total_loss / batch_size  # Retourne la perte moyenne pour ce batch
 
     def print_model_weights(self, model, title):
         print(title)
         for name, param in model.named_parameters():
             print(name, param.data)
+
 if __name__ == "__main__":
     agent = SnakeAgent()
     
-    #agent.print_model_weights(agent.model, "Model weights before loading:")
     try:
         agent.load_model(agent.model)
     except FileNotFoundError:
         print("No saved model found. Starting training from scratch.")
-    #agent.print_model_weights(agent.model, "Model weights after loading:")
     
     iterations = int(input("Enter the number of iterations for intense training: "))
     agent.intense_training(iterations)
-    
-    #agent.print_model_weights(agent.model, "Model weights after training:")
