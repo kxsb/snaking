@@ -1,5 +1,3 @@
-#gère grosso modo la logique de déplpacement et d'apprentissage du snake.
-
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -9,36 +7,34 @@ from collections import deque
 from snake_env import * #SnakeEnv, UP, DOWN, LEFT, RIGHT, CELL_SIZE
 import matplotlib.pyplot as plt
 
-plt.ion()
-
-# à intégrer dans l'interace graphique ultérieurement
-MODEL_PATH = 'snake_model.pth'
+MODEL_PATH = 'snake_model.pth' # Chemin par défaut pour sauvegarder le modèle
 class DQN(nn.Module):
     def __init__(self, input_dim, output_dim):
         super(DQN, self).__init__()
-        self.fc1 = nn.Linear(input_dim, 128) # ou 64
-        self.fc2 = nn.Linear(128, 64) # ou 256 ou 128 ou 64
-        self.fc3 = nn.Linear(64, output_dim) # ou 128 ou 64 ou 32
-
+        # Définition des couches du réseau de neurones
+        self.fc1 = nn.Linear(input_dim, 128)  # Première couche entièrement connectée
+        self.fc2 = nn.Linear(128, 64)  # Deuxième couche entièrement connectée
+        self.fc3 = nn.Linear(64, output_dim)  # Troisième couche (sortie)
     def forward(self, x):
-        x = torch.relu(self.fc1(x))
-        x = torch.relu(self.fc2(x))
-        x = self.fc3(x)
+        # Fonction de passage avant du réseau (calcul des sorties)
+        x = torch.relu(self.fc1(x))  # Activation ReLU pour la première couche
+        x = torch.relu(self.fc2(x))  # Activation ReLU pour la deuxième couche
+        x = self.fc3(x)  # Pas d'activation pour la couche de sortie
         return x
-    
+        
 # à intégrer dans l'interace graphique ultérieurement
 class SnakeAgent:
     def __init__(self):
-        self.env = SnakeEnv()
-        self.memory = deque(maxlen=100000)
-        self.gamma = 0.99
-        self.epsilon = 0.98
-        self.epsilon_min = 0.02
-        self.epsilon_decay = 0.995
-        self.learning_rate = 0.017
-        self.model = DQN(12, 3)  # 12 inputs, 3 outputs (go straight, turn left, turn right)
-        self.optimizer = optim.Adam(self.model.parameters(), lr=self.learning_rate)
-        self.loss_fn = nn.MSELoss()
+        self.env = SnakeEnv()  # Initialisation de l'environnement
+        self.memory = deque(maxlen=100000)  # Mémoire pour stocker les expériences passées
+        self.gamma = 0.99  # Facteur de réduction pour les récompenses futures
+        self.epsilon = 0.98  # Probabilité initiale pour l'exploration (choix aléatoire d'actions)
+        self.epsilon_min = 0.02  # Probabilité minimale pour epsilon (limite inférieure d'exploration)
+        self.epsilon_decay = 0.995  # Taux de décroissance pour epsilon
+        self.learning_rate = 0.017  # Taux d'apprentissage pour l'optimiseur
+        self.model = DQN(12, 3)  # Modèle DQN avec 12 entrées et 3 sorties (actions possibles)
+        self.optimizer = optim.Adam(self.model.parameters(), lr=self.learning_rate)  # Optimiseur Adam
+        self.loss_fn = nn.MSELoss()  # Fonction de perte (Mean Squared Error)
 
     def intense_training(self, iterations):
         #débogage# print("Starting intense training...")
@@ -241,6 +237,7 @@ class SnakeAgent:
         return state_vector
 
     def train(self, episodes, batch_size):
+        plt.ion()
         fig, ax = init_plots()  # Initialiser le graphique
         rewards_history = []
 
