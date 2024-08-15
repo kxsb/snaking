@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import json
 import os
 from snake import lancer_snake 
-from AIgames_interface import AIGamesInterface  # Importer l'interface AI Games
+from AIgames_interface import AIGamesInterface
 
 pygame.init()
 
