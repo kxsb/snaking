@@ -268,67 +268,53 @@ class AIGamesInterface:
     def run_training(self, iterations):
         try:
             print(f"Début de l'entraînement rapide pour {iterations} itérations...")
-            
-            start_time = time.time()  # Marque le début de l'entraînement
+
+            start_time = time.time()
 
             for i in range(iterations):
-                self.handle_stop_button()  # Vérifier si le bouton "Stop" a été pressé
+                pygame.event.pump()
 
-                self.agent.intense_training(1, self.model_path)  # Entraîner pour une itération
+                print(f"Entraînement en cours: itération {i+1}/{iterations}")
 
-                # Calculer le temps écoulé et le temps restant estimé
+                self.agent.intense_training(1, self.model_path)
+
                 elapsed_time = time.time() - start_time
                 time_per_iteration = elapsed_time / (i + 1)
                 remaining_time = (iterations - i - 1) * time_per_iteration
 
-                # Mettre à jour la barre de progression et afficher l'itération en cours
                 self.update_progress(i + 1, iterations, remaining_time)
-
-                # Laisser le temps à l'interface de se mettre à jour
-                pygame.event.pump()  # Traitement des événements pour maintenir l'interface active
-                pygame.time.delay(100)  # Pause pour que l'interface reste réactive
+                
+                pygame.display.update()
+                pygame.time.delay(100)
 
             print("Entraînement rapide terminé.")
             self.afficher_message("Entraînement terminé.")
 
         except KeyboardInterrupt:
             print("Entraînement interrompu par l'utilisateur.")
-
+        except Exception as e:
+            print(f"Erreur pendant l'entraînement: {e}")
         finally:
-            # Sauvegarde le modèle dans tous les cas (fin ou interruption)
-            print(f"Sauvegarde du modèle dans {self.model_path}.")
             save_model(self.agent.model, self.model_path)
             print(f"Modèle sauvegardé dans {self.model_path}.")
-                
+            self.training_in_progress = False  # Marque la fin de l'entraînement
+                                                
     def train_ai_fast(self, iterations=None):
-        # Ajouter le bouton "Stop" avant d'itérer sur les autres boutons
-        # self.buttons['stop'] = pygame.Rect(650, 500, 100, 50)
+        self.training_in_progress = True  # Indique que l'entraînement a commencé
 
         # Effacer l'interface actuelle
         self.screen.fill(WHITE)
         pygame.display.update()
 
-        # Dessiner le bouton "Stop"
-        # pygame.draw.rect(self.screen, (200, 0, 0), self.buttons['stop'])  # Dessiner le bouton "Stop" en rouge
-        # stop_text = self.font.render("Stop", True, WHITE)
-        # self.screen.blit(stop_text, (self.buttons['stop'].x + 25, self.buttons['stop'].y + 10))  # Positionner le texte au centre du bouton
-
-        pygame.display.update()  # Mettre à jour l'affichage pour inclure le bouton
-
-        # Demander à l'utilisateur combien d'itérations il souhaite faire
         if iterations is None:
             iterations = self.demander_iterations()
 
-        # Afficher un message indiquant que l'entraînement a commencé
         self.afficher_message("Entraînement en cours...")
 
-        # Vérifier si les paramètres ont été chargés
         if self.params_file == "Empty" or not self.params:
             print("Veuillez charger les paramètres d'entraînement avant de lancer l'entraînement.")
             return
 
-        # Initialiser l'agent pour l'entraînement
-        print("Initialisation de l'agent pour un entraînement rapide...")
         self.agent = SnakeAgent(
             env_type='full',
             gamma=self.params.get('gamma', 0.99),
@@ -347,43 +333,36 @@ class AIGamesInterface:
             print("Aucun modèle chargé. Veuillez d'abord charger un modèle.")
             return
 
-        print("Chargement du modèle...")
         try:
             load_model(self.agent.model, self.model_path)
             print("Modèle chargé avec succès.")
         except FileNotFoundError:
             print("Modèle non trouvé. Début de l'entraînement à partir de zéro.")
 
-        # Démarrer l'entraînement dans un thread séparé
         training_thread = threading.Thread(target=self.run_training, args=(iterations,))
         training_thread.start()
 
         # Boucle principale pour maintenir l'interface active et réactive
-        # while training_thread.is_alive():
-        #     self.handle_stop_button()  # Vérifie si le bouton Stop est pressé
-
-        #     # # Redessiner le bouton "Stop" sur chaque itération pour s'assurer qu'il reste visible
-        #     # pygame.draw.rect(self.screen, (200, 0, 0), self.buttons['stop'])
-        #     # self.screen.blit(stop_text, (self.buttons['stop'].x + 25, self.buttons['stop'].y + 10))
-
-        pygame.display.flip()
-        pygame.time.delay(100)  # Pause pour éviter une boucle trop rapide
-                            
+        while self.training_in_progress:  # Tant que l'entraînement n'est pas terminé
+            pygame.event.pump()  # Maintenir la fenêtre active
+            pygame.time.delay(100)  # Pause pour éviter une boucle trop rapide
+            pygame.display.update()
+                                        
     def update_progress(self, current_iteration, total_iterations, remaining_time):
         self.screen.fill(WHITE)
-        
-        # Dessiner la barre de progression
+            
+            # Dessiner la barre de progression
         progress_bar_width = 600
         progress_bar_height = 40
         progress = current_iteration / total_iterations
         filled_width = int(progress * progress_bar_width)
-        
+            
         progress_bar_rect = pygame.Rect((INTERFACE_WIDTH - progress_bar_width) // 2, (INTERFACE_HEIGHT // 2) - 20, progress_bar_width, progress_bar_height)
         pygame.draw.rect(self.screen, BLACK, progress_bar_rect, 2)
-        
+            
         filled_rect = pygame.Rect(progress_bar_rect.left, progress_bar_rect.top, filled_width, progress_bar_height)
         pygame.draw.rect(self.screen, BLUE, filled_rect)
-        
+            
         # Afficher le texte du temps restant
         font = pygame.font.SysFont(None, 36)
         time_text = f"Temps restant estimé: {int(remaining_time)} secondes"
@@ -391,12 +370,12 @@ class AIGamesInterface:
         time_rect = time_surface.get_rect(center=(INTERFACE_WIDTH // 2, (INTERFACE_HEIGHT // 2) + 60))
         self.screen.blit(time_surface, time_rect)
 
-        # Afficher l'itération en cours
+            # Afficher l'itération en cours
         iteration_text = f"Itération {current_iteration}/{total_iterations}"
         iteration_surface = font.render(iteration_text, True, BLACK)
         iteration_rect = iteration_surface.get_rect(center=(INTERFACE_WIDTH // 2, (INTERFACE_HEIGHT // 2) - 60))
         self.screen.blit(iteration_surface, iteration_rect)
-        
+            
         pygame.display.flip()
 
     def demander_iterations(self):
