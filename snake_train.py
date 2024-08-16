@@ -1,1 +1,1 @@
-#script remplacé par view_ai_play
+#script remplacé par train_ai_fast.py
