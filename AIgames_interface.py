@@ -16,6 +16,10 @@ import threading
 from train_ai_fast import TrainAIFast
 from create_new_model import create_and_save_model, MODEL_CONFIGS
 
+import matplotlib
+matplotlib.use('Agg')  # Utilisation de 'Agg' pour enregistrer les graphiques
+import matplotlib.pyplot as plt
+
 # Dimensions de la fenêtre de l'interface
 INTERFACE_WIDTH, INTERFACE_HEIGHT = 800, 600
 WHITE = (255, 255, 255)
@@ -307,7 +311,7 @@ class AIGamesInterface:
 
     def train_ai_fast_interface(self):
         if self.model_path and self.params_file != "Empty":
-            iterations = self.demander_iterations()  # Utilisation de la fonction pour obtenir le nombre d'itérations
+            iterations = self.demander_iterations()
             print("Début de l'entraînement rapide de l'IA...")
             train_ai = TrainAIFast(iterations=iterations)
             params = train_ai.load_hyperparameters(self.params_file)
@@ -326,9 +330,105 @@ class AIGamesInterface:
                 self.update_progress(i + 1, iterations, remaining_time)
 
             print("Entraînement terminé.")
+            
+            # Effacer la fenêtre Pygame
+            self.screen.fill(WHITE)
+            pygame.display.flip()
+
+            # Générer et enregistrer le graphique Matplotlib
+            self.afficher_graphique(train_ai.losses, train_ai.food_eated)
+
+            # Afficher le graphique dans Pygame
+            self.afficher_image("training_results.png")
         else:
             print("Veuillez sélectionner un modèle et un fichier de paramètres.")
-                    
+
+    def afficher_graphique(self, losses, food_eated):
+        plt.figure(figsize=(12, 6))
+
+        # Courbe des pertes
+        plt.subplot(1, 2, 1)
+        plt.plot(losses, label="Perte", color="blue")
+        plt.xlabel("Épisodes")
+        plt.ylabel("Perte")
+        plt.title("Évolution de la perte")
+        plt.legend()
+
+        # Vérification si toutes les pertes sont nulles ou très proches de zéro
+        if all(l == 0 or l is None for l in losses):
+            plt.ylim(-0.1, 0.1)
+
+        # Courbe de la moyenne des nourritures consommées toutes les 50 itérations
+        moyennes = self.calculer_moyenne_pommes(food_eated)
+        plt.subplot(1, 2, 2)
+        plt.plot(range(50, len(food_eated) + 1, 50), moyennes, label="Moyenne des nourritures consommées", color="green")
+        plt.xlabel("Épisodes")
+        plt.ylabel("Moyenne des nourritures consommées")
+        plt.title("Évolution des moyennes (par 50 itérations)")
+        plt.legend()
+
+        plt.tight_layout()
+        plt.savefig("training_results.png")  # Enregistrer le graphique en tant qu'image
+            
+    def afficher_image(self, image_path):
+        try:
+            # Charger l'image originale
+            image = pygame.image.load(image_path)
+            image_width, image_height = image.get_size()
+
+            # Calculer les nouvelles dimensions tout en conservant les proportions
+            aspect_ratio = image_width / image_height
+            if aspect_ratio > INTERFACE_WIDTH / INTERFACE_HEIGHT:
+                new_width = INTERFACE_WIDTH
+                new_height = int(INTERFACE_WIDTH / aspect_ratio)
+            else:
+                new_height = INTERFACE_HEIGHT
+                new_width = int(INTERFACE_HEIGHT * aspect_ratio)
+
+            # Redimensionner l'image en conservant les proportions
+            image = pygame.transform.scale(image, (new_width, new_height))
+
+            # Remplir l'écran de blanc (pour les bandes blanches)
+            self.screen.fill((255, 255, 255))
+
+            # Positionner l'image au centre
+            image_rect = image.get_rect(center=(INTERFACE_WIDTH // 2, INTERFACE_HEIGHT // 2))
+            self.screen.blit(image, image_rect.topleft)
+            
+            # Afficher le message "Press Esc to return" sur la bande blanche
+            font = pygame.font.SysFont(None, 36)
+            text_surface = font.render("Press Esc to return", True, (0, 0, 0))
+            text_rect = text_surface.get_rect(center=(INTERFACE_WIDTH // 2, INTERFACE_HEIGHT - 30))
+            self.screen.blit(text_surface, text_rect)
+
+            pygame.display.flip()
+            print(f"Image '{image_path}' affichée avec succès dans Pygame.")
+
+            # Maintenir l'affichage jusqu'à ce que l'utilisateur ferme la fenêtre ou appuie sur Échap
+            running = True
+            while running:
+                for event in pygame.event.get():
+                    if event.type == pygame.QUIT:
+                        pygame.quit()
+                        sys.exit()
+                    elif event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                        running = False
+
+                pygame.display.update()
+            
+            # Revenir à l'interface principale après avoir appuyé sur Échap
+            self.create_interface()  # Redessiner l'interface principale de l'AI Games Interface
+        except pygame.error as e:
+            print(f"Erreur lors du chargement de l'image dans Pygame : {e}")
+        
+    def calculer_moyenne_pommes(self, food_eated, intervalle=50):
+        moyennes = []
+        for i in range(0, len(food_eated), intervalle):
+            bloc = food_eated[i:i + intervalle]
+            moyenne = sum(bloc) / len(bloc)
+            moyennes.append(moyenne)
+        return moyennes
+
     def train_ai_lowder(self, iterations=None):
         # Ajouter le bouton "Stop" avant d'itérer sur les autres boutons
         # self.buttons['stop'] = pygame.Rect(650, 500, 100, 50)
@@ -428,7 +528,6 @@ class AIGamesInterface:
         
         pygame.display.flip()
 
-
     def demander_iterations(self):
         iterations = ""
         font = pygame.font.SysFont(None, 36)
@@ -465,7 +564,8 @@ class AIGamesInterface:
 
             clock.tick(30)  # Limite le framerate à 30 FPS
 
-        return int(iterations) if iterations.isdigit() else 1000      
+        return int(iterations) if iterations.isdigit() else 1000
+          
     def afficher_message(self, message, y_offset=0):
         font = pygame.font.SysFont(None, 36)
         text_surface = font.render(message, True, BLACK)

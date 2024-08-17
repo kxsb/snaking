@@ -1,1 +1,1 @@
-##fichier remplacer par view ai play
+#script remplacé part view_ai_play.py

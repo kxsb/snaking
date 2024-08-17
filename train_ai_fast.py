@@ -8,6 +8,7 @@ import numpy as np
 import os
 from create_new_model import MODEL_CONFIGS
 import time
+import matplotlib as plt
 
 class ActorCritic(nn.Module):
     def __init__(self, state_size, action_size, hidden_dims):
@@ -27,7 +28,9 @@ class ActorCritic(nn.Module):
 class TrainAIFast:  
     def __init__(self, iterations=1000):
         self.iterations = iterations
-        self.env = None  # Initialiser l'environnement
+        self.env = None
+        self.losses = []  # Pour stocker les pertes
+        self.food_eated = []  # Pour stocker la nourriture consommée
 
     def create_model(self, grid_size):
         if grid_size in MODEL_CONFIGS:
@@ -66,16 +69,18 @@ class TrainAIFast:
 
     def choisir_action(self, policy, state):
         state = torch.from_numpy(state).float().unsqueeze(0)
+        
+        if torch.isnan(state).any() or torch.isinf(state).any():
+            print("État contient NaN ou inf : ", state)
+        
         logits, _ = policy(state)
         
-        # Vérifiez si des valeurs invalides existent dans les logits
         if torch.isnan(logits).any() or torch.isinf(logits).any():
             print(f"Logits contains NaN or inf: {logits}")
             logits = torch.where(torch.isnan(logits) | torch.isinf(logits), torch.zeros_like(logits), logits)
 
         probas = torch.softmax(logits, dim=1)
-
-        # Vérifiez si des valeurs invalides existent dans les probabilités
+        
         if torch.isnan(probas).any() or torch.isinf(probas).any() or (probas < 0).any():
             print(f"Probabilities contain NaN, inf, or < 0: {probas}")
             probas = torch.clamp(probas, min=0, max=1)
@@ -111,6 +116,8 @@ class TrainAIFast:
         loss = torch.stack(policy_loss).sum() + torch.stack(value_loss).sum()
         loss.backward()
         optimizer.step()
+
+        return loss.item()  # Assurez-vous de retourner la perte calculée
 
     def flatten_state(self, state):
         head = state['snake'][0]
@@ -186,6 +193,9 @@ class TrainAIFast:
         flattened_state = self.flatten_state(state)
         rewards, log_probs, values = [], [], []
 
+        total_loss = 0
+        food_count = 0
+
         for t in range(100):  # Limiter à 100 étapes par épisode
             action = self.choisir_action(self.model, flattened_state)
             
@@ -200,19 +210,28 @@ class TrainAIFast:
 
             next_state, reward, done = self.env.step(action)
             rewards.append(reward)
+            
+            if reward > 0:
+                food_count += 1  # Augmente le nombre de nourritures consommées
 
             if done:
                 break
 
             flattened_state = self.flatten_state(next_state)
 
-        self.mise_a_jour(self.model, optimizer, rewards, log_probs, values, gamma=params.get('gamma', 0.99))
-        print(f"Épisode {current_iteration + 1}/{self.iterations} terminé. Score: {len(self.env.snake) - 1}")
+        # Calculer la perte pour cette itération
+        loss = self.mise_a_jour(self.model, optimizer, rewards, log_probs, values, gamma=params.get('gamma', 0.99))
+        self.losses.append(loss if loss is not None else 0)  # Enregistrer la perte
+        self.food_eated.append(food_count)  # Enregistrer le nombre de nourritures consommées
+
+        print(f"Épisode {current_iteration + 1}/{self.iterations} terminé. Score: {len(self.env.snake) - 1}, Perte: {loss}")
 
         if current_iteration == self.iterations - 1:
             torch.save({'state_dict': self.model.state_dict(), 'grid_size': self.env.grid_size}, model_path)
             print(f"Modèle entraîné sauvegardé à {model_path}")
             
+            
+                  
 if __name__ == "__main__":
     Tk().withdraw()
 
