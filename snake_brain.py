@@ -22,16 +22,15 @@ class DQN(nn.Module):
         x = self.fc3(x)  # Pas d'activation pour la couche de sortie
         return x
         
-# à intégrer dans l'interace graphique ultérieurement
 class SnakeAgent:
     def __init__(self):
         self.env = SnakeEnv()  # Initialisation de l'environnement
         self.memory = deque(maxlen=100000)  # Mémoire pour stocker les expériences passées
-        self.gamma = 0.99  # Facteur de réduction pour les récompenses futures
-        self.epsilon = 0.98  # Probabilité initiale pour l'exploration (choix aléatoire d'actions)
-        self.epsilon_min = 0.02  # Probabilité minimale pour epsilon (limite inférieure d'exploration)
-        self.epsilon_decay = 0.995  # Taux de décroissance pour epsilon
-        self.learning_rate = 0.017  # Taux d'apprentissage pour l'optimiseur
+        self.gamma = 0.95  # Facteur de réduction pour les récompenses futures
+        self.epsilon = 0.05  # Probabilité initiale pour l'exploration (choix aléatoire d'actions)
+        self.epsilon_min = 0.85  # Probabilité minimale pour epsilon (limite inférieure d'exploration)
+        self.epsilon_decay = 0.01  # Taux de décroissance pour epsilon
+        self.learning_rate = 0.00  # Taux d'apprentissage pour l'optimiseur
         self.model = DQN(12, 3)  # Modèle DQN avec 12 entrées et 3 sorties (actions possibles)
         self.optimizer = optim.Adam(self.model.parameters(), lr=self.learning_rate)  # Optimiseur Adam
         self.loss_fn = nn.MSELoss()  # Fonction de perte (Mean Squared Error)
@@ -147,8 +146,8 @@ class SnakeAgent:
             action = torch.argmax(act_values).item()
             #débogage# print(f"Model action: {action}")
         
-        new_direction = self.get_new_direction(action)
-        #débogage# print(f"Action: {action}, New Direction: {new_direction}")
+            new_direction = self.get_new_direction(action)
+            #débogage# print(f"Action: {action}, New Direction: {new_direction}")
 
         return action
         
@@ -240,47 +239,41 @@ class SnakeAgent:
         plt.ion()
         fig, ax = init_plots()  # Initialiser le graphique
         rewards_history = []
+        paused = False  # Ajoutez une variable de pause
 
         try:
             for e in range(episodes):
-                #débogage# print(f"Starting episode {e+1}/{episodes}")
                 state = self.get_state()
                 if state is None:
                     raise ValueError("L'état est None au début de l'épisode.")
                 total_reward = 0
 
-                for time in range(35000):
-                    #débogage# print(f"Time step {time+1}/35000")
+                while True:  # Boucle infinie remplacée
                     self.env.handle_events()  # Gérer les événements Pygame
-                    if not self.env.paused:
-                        #débogage# print("Agent is not paused")
+
+                    if not paused:
                         action = self.act(state)
-                        #débogage# print(f"Action taken: {action}")
-                        #débogage# print(f"Current State: {state}")
-                        
-                        try:
-                            next_state, reward, done = self.env.step(action)
-                        except Exception as e:
-                            #débogage# print(f"Error during env.step(action): {e}")
-                            raise e
-                        
-                        # Vérification après l'étape
-                        #débogage# print(f"Next State: {next_state}, Reward: {reward}, Done: {done}")
+                        next_state, reward, done = self.env.step(action)
                         
                         if next_state is None:
                             raise ValueError("L'état suivant est None après une action.")
                         
-                        state = next_state
                         self.remember(state, action, reward, next_state, done)
+                        state = next_state
                         total_reward += reward
 
-                        if done:
-                            #débogage# print(f"Episode: {e}/{episodes}, Score: {self.env.score}")
+                        if done:  # Sortie de la boucle uniquement en cas de collision ou de fin de partie
+                            print(f"Épisode: {e+1}/{episodes}, Score: {self.env.score}, Récompense totale: {total_reward}")
                             self.env.reset()
                             break
 
                         self.env.render()
-                        #débogage# print("Render completed")
+
+                    # Toggle pause if needed
+                    keys = pygame.key.get_pressed()
+                    if keys[pygame.K_p]:  # Supposons que 'P' soit la touche pour mettre en pause
+                        paused = not paused
+                        print("Entraînement mis en pause." if paused else "Entraînement repris.")
 
                     update_plots(ax, e, total_reward, rewards_history)
 
@@ -293,8 +286,7 @@ class SnakeAgent:
             self.env.close()  # Fermer proprement Pygame
             plt.ioff()  # Désactiver le mode interactif de Matplotlib
             plt.show()  # Afficher le graphique
-        
-                    
+
 def update_plots(ax, iteration, reward, rewards_history):
     rewards_history.append(reward)
 
@@ -313,6 +305,20 @@ def init_plots():
     
     return fig, ax
 
+def update_plots(ax, iteration, reward, rewards_history):
+    rewards_history.append(reward)
+
+    # Calculer la moyenne mobile des 50 derniers épisodes pour lisser le graphique
+    moving_avg = np.convolve(rewards_history, np.ones((50,)) / 50, mode='valid')
+
+    ax.clear()
+    ax.plot(range(len(rewards_history)), rewards_history, 'b-', label="Récompenses")
+    if len(moving_avg) > 0:
+        ax.plot(range(len(moving_avg)), moving_avg, 'r-', label="Moyenne mobile (50)")
+    
+    ax.legend()
+    plt.pause(0.01)  # Pause pour rafraîchir l'affichage des graphiques
+    
 def save_model(model, path=MODEL_PATH):
     torch.save(model.state_dict(), path)
     print(f"Model saved to {path}")
