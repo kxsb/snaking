@@ -34,22 +34,23 @@ class SnakeAgent:
         self.env = SnakeEnv()
         
         # Initialisation de la mémoire avec une taille maximale de 10000
-        self.memory = deque(maxlen=10000)
+        self.memory = deque(maxlen=20000)
+        
         
         # Facteur de discount pour le calcul des récompenses futures
-        self.gamma = 0.90
+        self.gamma = 0.95
         
         # Taux d'exploration initial pour l'algorithme epsilon-greedy
-        self.epsilon = 0.90
+        self.epsilon = 0.92
         
         # Taux d'exploration minimum
-        self.epsilon_min = 0.05
+        self.epsilon_min = 0.005
         
         # Taux de décroissance de l'exploration
         self.epsilon_decay = 0.995
         
         # Taux d'apprentissage pour l'optimiseur
-        self.learning_rate = 0.002
+        self.learning_rate = 0.0007
         
         # Initialisation du modèle DQN avec 12 entrées et 3 sorties (aller tout droit, tourner à gauche, tourner à droite)
         self.model = DQN(12, 3)

@@ -1,5 +1,3 @@
-#gère grosso modo l'environnement de jeu
-
 import pygame
 import sys
 import random
@@ -27,14 +25,28 @@ RIGHT = (1, 0)
 
 class SnakeEnv:
     def __init__(self):
-        # Création de la fenêtre de jeu avec une zone pour les boutons en bas
         self.screen = pygame.display.set_mode((WIDTH, HEIGHT + BUTTON_HEIGHT))
-        pygame.display.set_caption("Snake Game")  # Titre de la fenêtre
-        self.clock = pygame.time.Clock()  # Initialisation de l'horloge pour contrôler la fréquence de rafraîchissement
-        self.reset()  # Réinitialise l'état du jeu
-        self.paused = False  # État du jeu (en pause ou non)
-        self.display_stats = False  # État initial de l'affichage statistique (désactivé)
-        self.create_buttons()  # Crée les boutons pour l'interface utilisateur
+        pygame.display.set_caption("Snake Game")
+        self.clock = pygame.time.Clock()
+        self.reset()
+        self.paused = False
+        self.display_stats = False
+
+        # Charger l'image de fond
+        self.background_image = pygame.image.load('fond.jpg').convert()
+
+        # Charger la texture pour la tête du serpent
+        self.snake_head_texture = pygame.image.load('tete.png').convert_alpha()
+
+        # Charger la texture pour le corps du serpent
+        self.snake_body_texture = pygame.image.load('texture6.png').convert_alpha()
+
+        # Redimensionner les textures pour qu'elles correspondent à la taille d'une cellule
+        self.snake_head_texture = pygame.transform.scale(self.snake_head_texture, (CELL_SIZE, CELL_SIZE))
+        self.snake_body_texture = pygame.transform.scale(self.snake_body_texture, (CELL_SIZE, CELL_SIZE))
+
+        # Redimensionner l'image de fond si nécessaire pour correspondre à la taille de l'écran
+        self.background_image = pygame.transform.scale(self.background_image, (WIDTH, HEIGHT + BUTTON_HEIGHT))
 
     def create_buttons(self):
         # Définit les zones de détection pour les boutons (rectangles)
@@ -43,20 +55,8 @@ class SnakeEnv:
         self.stats_button = pygame.Rect(280, HEIGHT + 10, 150, 30)  # Nouveau bouton pour les stats
         
     def draw_buttons(self):
-        # Dessine les boutons et leur texte sur l'écran
-        pygame.draw.rect(self.screen, GRAY, self.play_pause_button)
-        pygame.draw.rect(self.screen, GRAY, self.intense_training_button)
-        font = pygame.font.SysFont(None, 24)  # Police pour le texte des boutons
-        play_pause_text = font.render('Play/Pause', True, BLACK)
-        intense_training_text = font.render('Intense Training', True, BLACK)
-        # Positionne le texte sur les boutons
-        self.screen.blit(play_pause_text, (20, HEIGHT + 15))
-        self.screen.blit(intense_training_text, (130, HEIGHT + 15))
-        pygame.draw.rect(self.screen, GRAY, self.stats_button)
-        font = pygame.font.SysFont(None, 24)
-        stats_text = font.render('Toggle Stats', True, BLACK)
-        self.screen.blit(stats_text, (290, HEIGHT + 15))  # Positionnement du texte du bouton stats
- 
+        pass
+    
     def handle_events(self):
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -139,9 +139,9 @@ class SnakeEnv:
         # Calcul de la nouvelle position de la tête du serpent
         new_head = (self.snake[0][0] + self.direction[0] * CELL_SIZE,
                     self.snake[0][1] + self.direction[1] * CELL_SIZE)
-
         if self.is_collision(new_head):
-            return self.get_state(), -1, True  # Si collision, fin de partie avec une pénalité
+            print("Collision detected")  # Debug message for collision detection
+            return self.get_state(), -1, True  # If collision, end game with a penalty
 
         # Mise à jour de la position du serpent
         self.snake.insert(0, new_head)
@@ -166,43 +166,66 @@ class SnakeEnv:
             position[1] < 0 or position[1] >= HEIGHT or
             position in self.snake):
             return True
+        
+        
+            
         return False
-
+    
     def render(self):
-        # Affiche le jeu à l'écran
-        self.screen.fill(BLACK)  # Fond noir
-        for segment in self.snake:  # Affiche chaque segment du serpent
-            pygame.draw.rect(self.screen, GREEN, pygame.Rect(segment[0], segment[1], CELL_SIZE, CELL_SIZE))
-        pygame.draw.rect(self.screen, RED, pygame.Rect(self.food[0], self.food[1], CELL_SIZE, CELL_SIZE))  # Affiche la nourriture
-        self.draw_buttons()  # Affiche les boutons
-        pygame.display.flip()  # Met à jour l'affichage
-        self.clock.tick(80)  # Contrôle la vitesse du jeu (80 FPS ici)
+        # Afficher l'image de fond
+        self.screen.blit(self.background_image, (0, 0))
 
-    def handle_events(self):
-        # Gère les événements, y compris les interactions avec les boutons
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                pygame.quit()
-                sys.exit()
-            elif event.type == pygame.MOUSEBUTTONDOWN:
-                if self.play_pause_button.collidepoint(event.pos):  # Gestion du clic sur Play/Pause
-                    self.paused = not self.paused
-                    #débogage# print("Play/Pause button clicked")
-                elif self.intense_training_button.collidepoint(event.pos):  # Gestion du clic sur Intense Training
-                    self.intense_training()
-                    #débogage# print("Intense Training button clicked")
-            elif event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_ESCAPE:
-                    pygame.quit()
-                    sys.exit()
+        # Déterminer l'angle de rotation pour chaque segment en fonction de la direction
+        for i, segment in enumerate(self.snake):
+            if i == 0:  # Tête du serpent
+                texture = self.snake_head_texture
+            else:  # Corps du serpent
+                texture = self.snake_body_texture
+            
+            # Déterminer la direction du segment actuel
+            if i == 0:
+                direction = self.direction
+            else:
+                # Calcul de la direction entre ce segment et le segment précédent
+                direction = (self.snake[i-1][0] - segment[0], self.snake[i-1][1] - segment[1])
+
+            # Calculer l'angle en fonction de la direction
+            if direction == RIGHT:
+                angle = 270  # Vers la droite
+            elif direction == LEFT:
+                angle = 90  # Vers la gauche
+            elif direction == UP:
+                angle = 0  # Vers le haut
+            elif direction == DOWN:
+                angle = 180  # Vers le bas
+
+            # Faire pivoter la texture selon l'angle calculé
+            rotated_texture = pygame.transform.rotate(texture, angle)
+            
+            # Dessiner la texture pivotée sur l'écran
+            self.screen.blit(rotated_texture, (segment[0], segment[1]))
+
+        # Dessiner la nourriture (vous pouvez également utiliser une texture pour la nourriture)
+        pygame.draw.rect(self.screen, RED, pygame.Rect(self.food[0], self.food[1], CELL_SIZE, CELL_SIZE))
+
+        # Mettre à jour l'écran
+        pygame.display.flip()
+        self.clock.tick(60)  # Contrôle la vitesse du jeu (60 FPS ici)
+    
+def handle_events(self):
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            pygame.quit()
+            sys.exit()
                     
     def close(self):
         pygame.quit()
-                
+
 def intense_training(self):
     iterations = int(input("Enter the number of iterations for intense training: "))
     self.agent.intense_training(iterations)
     pygame.quit()
+
 
 if __name__ == "__main__":
     env = SnakeEnv()
