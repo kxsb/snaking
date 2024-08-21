@@ -1,6 +1,7 @@
 import pygame
 import sys
 import random
+import numpy as np
 
 # Initialisation de Pygame
 pygame.init()
@@ -149,7 +150,7 @@ class SnakeEnv:
         if new_head == self.food:  # Si le serpent mange la nourriture
             self.food = self.spawn_food()  # Nouvelle position pour la nourriture
             self.score += 2  # Augmentation du score
-            reward = 1  # Récompense pour avoir mangé la nourriture
+            reward = 0.9  # Récompense pour avoir mangé la nourriture
         else:
             self.snake.pop()  # Si pas de nourriture, la queue du serpent bouge
             reward = 0
@@ -160,16 +161,30 @@ class SnakeEnv:
         
         return state, reward, False  # Retourne l'état, la récompense et un flag indiquant si la partie est terminée
 
+    def grid_state(self):
+        # Dimensions de la grille
+        grid_width = WIDTH // CELL_SIZE  # Par exemple 32
+        grid_height = HEIGHT // CELL_SIZE  # Par exemple 24
+
+        # Initialisation de la grille avec des zéros
+        grid = np.zeros((grid_height, grid_width), dtype=np.float32)
+
+        # Marquer les positions du serpent dans la grille
+        for segment in self.snake:
+            x, y = segment
+            grid[y // CELL_SIZE][x // CELL_SIZE] = 1.0  # 1.0 pour les segments du serpent
+
+        # Marquer la position de la nourriture
+        food_x, food_y = self.food
+        grid[food_y // CELL_SIZE][food_x // CELL_SIZE] = -1.0  # -1.0 pour la nourriture
+
+        return grid  # Retourner la grille 2D, qui sera aplatie dans SnakeAgent
+    
     def is_collision(self, position):
         # Vérifie si la position donnée entre en collision avec les murs ou le corps du serpent
-        if (position[0] < 0 or position[0] >= WIDTH or
-            position[1] < 0 or position[1] >= HEIGHT or
-            position in self.snake):
-            return True
-        
-        
-            
-        return False
+        return (position[0] < 0 or position[0] >= WIDTH or
+                position[1] < 0 or position[1] >= HEIGHT or
+                position in self.snake)
     
     def render(self):
         # Afficher l'image de fond
@@ -210,7 +225,7 @@ class SnakeEnv:
 
         # Mettre à jour l'écran
         pygame.display.flip()
-        self.clock.tick(60)  # Contrôle la vitesse du jeu (60 FPS ici)
+        self.clock.tick(35)  # Contrôle la vitesse du jeu (60 FPS ici)
     
 def handle_events(self):
     for event in pygame.event.get():

@@ -11,15 +11,14 @@ MODEL_PATH = 'snake_model.pth' # Chemin par défaut pour sauvegarder le modèle
 class DQN(nn.Module):
     def __init__(self, input_dim, output_dim):
         super(DQN, self).__init__()
-        # Définition des couches du réseau de neurones
-        self.fc1 = nn.Linear(input_dim, 128)  # Première couche entièrement connectée
-        self.fc2 = nn.Linear(128, 64)  # Deuxième couche entièrement connectée
-        self.fc3 = nn.Linear(64, output_dim)  # Troisième couche (sortie)
+        self.fc1 = nn.Linear(input_dim, 128)  # input_dim doit être la taille de la grille aplatie
+        self.fc2 = nn.Linear(128, 64)
+        self.fc3 = nn.Linear(64, output_dim)
+
     def forward(self, x):
-        # Fonction de passage avant du réseau (calcul des sorties)
-        x = torch.relu(self.fc1(x))  # Activation ReLU pour la première couche
-        x = torch.relu(self.fc2(x))  # Activation ReLU pour la deuxième couche
-        x = self.fc3(x)  # Pas d'activation pour la couche de sortie
+        x = torch.relu(self.fc1(x))
+        x = torch.relu(self.fc2(x))
+        x = self.fc3(x)
         return x
         
 class SnakeAgent:
